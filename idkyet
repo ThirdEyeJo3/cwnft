@@ -1,0 +1,55 @@
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+
+contract MyNFT is ERC721, Ownable {
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIdCounter;
+    
+    struct Nft {
+        uint256 id;
+        string name;
+        uint256 price;
+        address payable owner;
+        bool forSale;
+    }
+    
+    mapping (uint256 => Nft) public nfts;
+
+    constructor() ERC721("MyNFT", "MNFT") {}
+    
+    function mintNft(string memory name, uint256 price) public onlyOwner {
+        uint256 newTokenId = _tokenIdCounter.current();
+        _safeMint(msg.sender, newTokenId);
+        nfts[newTokenId] = Nft(newTokenId, name, price, payable(msg.sender), true);
+        _tokenIdCounter.increment();
+    }
+    
+    function buyNft(uint256 tokenId) public payable {
+        require(nfts[tokenId].forSale, "NFT not for sale");
+        require(msg.value == nfts[tokenId].price, "Incorrect payment amount");
+        address payable previousOwner = nfts[tokenId].owner;
+        previousOwner.transfer(msg.value);
+        _transfer(previousOwner, msg.sender, tokenId);
+        nfts[tokenId].owner = payable(msg.sender);
+        nfts[tokenId].forSale = false;
+    }
+    
+    function putNftForSale(uint256 tokenId, uint256 price) public {
+        require(msg.sender == nfts[tokenId].owner, "You do not own this NFT");
+        nfts[tokenId].forSale = true;
+        nfts[tokenId].price = price;
+    }
+    
+    function takeOffMarket(uint256 tokenId) public {
+        require(msg.sender == nfts[tokenId].owner, "You do not own this NFT");
+        nfts[tokenId].forSale = false;
+    }
+    
+    function withdraw() public onlyOwner {
+        address payable _owner = payable(owner());
+        _owner.transfer(address(this).balance);
+    }
+}
